@@ -1,7 +1,5 @@
 package net.kdt.pojavlaunch.fragments;
 
-import static net.kdt.pojavlaunch.Tools.hasOnlineProfile;
-
 import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
@@ -20,6 +18,10 @@ import java.io.File;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Creates an offline/local Minecraft profile without requiring Microsoft ownership.
+ * This account type is intentionally offline-only and is not a Microsoft identity.
+ */
 public class LocalLoginFragment extends Fragment {
     public static final String TAG = "LOCAL_LOGIN_FRAGMENT";
 
@@ -33,18 +35,17 @@ public class LocalLoginFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        // This is overkill but meh
-        if (!hasOnlineProfile()){
-            Tools.swapFragment(requireActivity(), MainMenuFragment.class, MainMenuFragment.TAG, null);
-        }
         mUsernameEditText = view.findViewById(R.id.login_edit_email);
         view.findViewById(R.id.login_button).setOnClickListener(v -> {
             if(!checkEditText()) {
                 Context context = v.getContext();
-                Tools.dialog(context, context.getString(R.string.local_login_bad_username_title), context.getString(R.string.local_login_bad_username_text));
+                Tools.dialog(context, context.getString(R.string.local_login_bad_username_title),
+                        context.getString(R.string.local_login_bad_username_text));
                 return;
             }
 
+            // The existing launcher account pipeline uses an empty password for
+            // local profiles; it creates the local account with a local/offline token.
             ExtraCore.setValue(ExtraConstants.MOJANG_LOGIN_TODO, new String[]{
                     mUsernameEditText.getText().toString(), "" });
 
@@ -52,18 +53,13 @@ public class LocalLoginFragment extends Fragment {
         });
     }
 
-
-    /** @return Whether the mail (and password) text are eligible to make an auth request  */
     private boolean checkEditText(){
-
         String text = mUsernameEditText.getText().toString();
-
         Matcher matcher = mUsernameValidationPattern.matcher(text);
         return !(text.isEmpty()
                 || text.length() < 3
                 || text.length() > 16
-                || !matcher.find()
-                || new File(Tools.DIR_ACCOUNT_NEW + "/" + text + ".json").exists()
-        );
+                || !matcher.matches()
+                || new File(Tools.DIR_ACCOUNT_NEW + "/" + text + ".json").exists());
     }
 }
