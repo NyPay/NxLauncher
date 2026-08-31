@@ -27,40 +27,44 @@ jobs:
         with:
           validate-wrappers: true
           gradle-version: '9.5.0'
-      - name: Fix Android resource format strings
+      - name: Fix Android resources safely
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          for p in Path('app_pojavlauncher/src/main/res').glob('values*/strings.xml'):
-              s = p.read_text(encoding='utf-8')
-              # Android requires positional arguments when a string has multiple format arguments.
-              n = 0
-              def fix(m):
-                  nonlocal_dummy = None
-                  nonlocal_counter[0] += 1
-                  return '%' + str(nonlocal_counter[0]) + '$' + m.group(1)
-              # Convert only unnumbered printf arguments, preserving %% and already-numbered args.
-              parts = re.split(r'(%(?:[0-9]+\$)?[-+0-9.#]*[a-zA-Z]|%%)', s)
-              out=[]; count=0
-              for token in parts:
-                  if re.fullmatch(r'%[a-zA-Z]', token) and token != '%%':
-                      count += 1
-                      out.append('%'+str(count)+'$'+token[1:])
-                  else:
-                      out.append(token)
-              s=''.join(out)
-              # Remove invalid literal backslash escapes which AAPT rejects; preserve XML escapes.
-              s=re.sub(r'\\(?![nrt"\\\'])', '', s)
-              p.write_text(s, encoding='utf-8')
+          roots = [Path('app_pojavlauncher/src/main/res')]
+          # Only repair actual Android string-format syntax. Do not touch dependency caches.
+          for root in roots:
+              for p in root.glob('values*/strings.xml'):
+                  s = p.read_text(encoding='utf-8')
+                  # Android aapt requires positional arguments when a format string has >1 argument.
+                  def fix_string(m):
+                      attrs, body = m.group(1), m.group(2)
+                      if 'formatted="false"' in attrs:
+                          return m.group(0)
+                      toks = list(re.finditer(r'%(?!%)(?:[0-9]+\$)?[-+0-9.#]*[a-zA-Z]', body))
+                      if len(toks) <= 1 or any(re.search(r'%[0-9]+\$', t.group(0)) for t in toks):
+                          return m.group(0)
+                      i = 0
+                      def repl(t):
+                          nonlocal i
+                          i += 1
+                          x = t.group(0)
+                          return '%' + str(i) + '$' + x[1:]
+                      body = re.sub(r'%(?!%)[-+0-9.#]*[a-zA-Z]', repl, body)
+                      return '<string' + attrs + '>' + body + '</string>'
+                  s = re.sub(r'<string\b([^>]*)>(.*?)</string>', fix_string, s, flags=re.S)
+                  p.write_text(s, encoding='utf-8')
           PY
       - name: Build release APK
         run: |
           chmod +x ./gradlew
           ./gradlew :app_pojavlauncher:assembleRelease --stacktrace
           mkdir -p out
-          cp app_pojavlauncher/build/outputs/apk/release/*.apk out/NXLauncher-v1.0.0.apk
+          apk=$(find app_pojavlauncher/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)
+          test -n "$apk"
+          cp "$apk" out/NXLauncher-v1.0.0.apk
           sha256sum out/NXLauncher-v1.0.0.apk > out/NXLauncher-v1.0.0.sha256
       - name: Upload APK
         uses: actions/upload-artifact@v4
