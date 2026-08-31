@@ -1,7 +1,5 @@
 package net.kdt.pojavlaunch.fragments;
 
-import static net.kdt.pojavlaunch.Tools.hasNoOnlineProfileDialog;
-
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -13,6 +11,7 @@ import androidx.fragment.app.Fragment;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
 
+/** NXLauncher account selection: Microsoft or offline/local account. */
 public class SelectAuthFragment extends Fragment {
     public static final String TAG = "AUTH_SELECT_FRAGMENT";
 
@@ -25,7 +24,12 @@ public class SelectAuthFragment extends Fragment {
         Button mMicrosoftButton = view.findViewById(R.id.button_microsoft_authentication);
         Button mLocalButton = view.findViewById(R.id.button_local_authentication);
 
-        mMicrosoftButton.setOnClickListener(v -> Tools.swapFragment(requireActivity(), MicrosoftLoginFragment.class, MicrosoftLoginFragment.TAG, null));
-        mLocalButton.setOnClickListener(v -> hasNoOnlineProfileDialog(requireActivity(), () -> Tools.swapFragment(requireActivity(), LocalLoginFragment.class, LocalLoginFragment.TAG, null)));
+        mMicrosoftButton.setOnClickListener(v ->
+                Tools.swapFragment(requireActivity(), MicrosoftLoginFragment.class, MicrosoftLoginFragment.TAG, null));
+
+        // Local means an offline profile. It must not require an already authenticated
+        // Microsoft account or Minecraft ownership check.
+        mLocalButton.setOnClickListener(v ->
+                Tools.swapFragment(requireActivity(), LocalLoginFragment.class, LocalLoginFragment.TAG, null));
     }
 }
