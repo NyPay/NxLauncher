@@ -40,8 +40,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          validate-wrappers: false
-          gradle-version: '9.6.1'
+          validate-wrappers: true
+          gradle-version: '9.5.0'
 
       - name: Prepare
         run: |
