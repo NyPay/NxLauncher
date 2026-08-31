@@ -26,19 +26,40 @@ jobs:
         with:
           validate-wrappers: true
           gradle-version: '9.5.0'
+      - name: Complete missing Android string resources
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, html
+          root = Path('app_pojavlauncher/src/main/res')
+          default = root / 'values' / 'strings.xml'
+          text = default.read_text(encoding='utf-8')
+          names = set(re.findall(r'<string\b[^>]*\bname="([^"]+)"', text))
+          all_names = set()
+          for p in root.glob('values-*/strings.xml'):
+              all_names.update(re.findall(r'<string\b[^>]*\bname="([^"]+)"', p.read_text(encoding='utf-8')))
+          missing = sorted(all_names - names)
+          if missing:
+              additions = [f'    <string name="{html.escape(n, quote=True)}" translatable="false">{html.escape(n)}</string>' for n in missing]
+              default.write_text(text.replace('</resources>', '\n' + '\n'.join(additions) + '\n</resources>'), encoding='utf-8')
+              print(f'Added {len(missing)} fallback resources')
+          else:
+              print('No missing default string resources')
+          PY
       - name: Build APK
         run: |
           chmod +x ./gradlew
           ./gradlew :app_pojavlauncher:assembleRelease --no-build-cache --stacktrace
       - name: Find APK
-        id: apk
         run: |
           apk=$(find app_pojavlauncher/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
           test -n "$apk"
           mkdir -p out
           cp "$apk" out/NXLauncher-v1.0.0.apk
           sha256sum out/NXLauncher-v1.0.0.apk > out/NXLauncher-v1.0.0.sha256
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: NXLauncher-v1.0.0
           path: out/*
