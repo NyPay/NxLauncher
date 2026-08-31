@@ -1,19 +1,33 @@
-name: NXLauncher Android CI
+name: Android CI
+
 on:
-  workflow_dispatch:
+  pull_request:
+    branches-ignore:
+      - 'l10n_v3_openjdk' 
+    types: [ opened, reopened ]
   push:
-    branches: [nxlauncher-v1.0.0, main, master]
+    branches-ignore:
+      - 'l10n_v3_openjdk'
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      GPLAY_KEYSTORE_PASSWORD: ${{ secrets.GPLAY_KEYSTORE_PASSWORD }}
+      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          submodules: recursive
-      - uses: actions/setup-java@v4
+          submodules: "recursive"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '21'
+
       - name: Get JRE 8
         uses: dawidd6/action-download-artifact@v9
         with:
@@ -23,99 +37,75 @@ jobs:
           repo: AngelAuraMC/angelauramc-openjdk-build
           branch: buildjre8
           name: jre8-pojav
+
+      # - name: Get JRE17
+      #   uses: dawidd6/action-download-artifact@v9
+      #   with:
+      #     workflow: build.yml
+      #     path: app_pojavlauncher/src/main/assets/components/jre-new
+      #     workflow_conclusion: completed
+      #     repo: AngelAuraMC/angelauramc-openjdk-build
+      #     branch: buildjre17-21
+      #     name: jre17-pojav
+      #
+      # - name: Get JRE21
+      #   uses: dawidd6/action-download-artifact@v9
+      #   with:
+      #     workflow: build.yml
+      #     path: app_pojavlauncher/src/main/assets/components/jre-21
+      #     workflow_conclusion: completed
+      #     repo: AngelAuraMC/angelauramc-openjdk-build
+      #     branch: buildjre17-21
+      #     name: jre21-pojav
+      #
+      # - name: Get JRE25
+      #   uses: dawidd6/action-download-artifact@v9
+      #   with:
+      #     workflow: build.yml
+      #     path: app_pojavlauncher/src/main/assets/components/jre-25
+      #     workflow_conclusion: completed
+      #     repo: FCL-Team/Android-OpenJDK-Build
+      #     branch: Build_JRE_25
+      #     name: jre25-multiarch
+
       - uses: gradle/actions/setup-gradle@v4
         with:
-          validate-wrappers: true
-          gradle-version: '9.5.0'
-      - name: Prepare Android resources and dependencies
-        shell: bash
+          validate-wrappers: false
+          gradle-version: "9.6.1"
+
+      - name: Run scripts
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re, zipfile, tempfile, shutil
+          ./scripts/languagelist_updater.sh
+          mkdir out
 
-          root = Path('app_pojavlauncher/src/main/res')
-          exact = {
-              'dl_library_sha_unknown': 'Library %1$s cannot be checked; assuming it is valid.',
-              'global_error_field_empty': 'This field cannot be empty.',
-              'multirt_nocompatiblert': 'No compatible Java Runtime found. Java %1$d or newer is required.',
-              'multirt_nojava8rt': 'Java 8 is not installed. Install Java 8 to use this option.'
-          }
-          string_re = re.compile(r'<string\b([^>]*)>(.*?)</string>', re.S)
-          name_re = re.compile(r'\bname="([^"]+)"')
-          fmt_re = re.compile(r'%(?!%)(?:([0-9]+)\$)?[-+0-9.#]*[a-zA-Z]')
-
-          for p in root.glob('values*/strings.xml'):
-              s = p.read_text(encoding='utf-8')
-
-              def replace_string(m):
-                  attrs, body = m.group(1), m.group(2)
-                  nm = name_re.search(attrs)
-                  name = nm.group(1) if nm else ''
-                  if name in exact:
-                      return '<string name="' + name + '">' + exact[name] + '</string>'
-                  tokens = list(fmt_re.finditer(body))
-                  if len(tokens) > 1:
-                      used = {int(t.group(1)) for t in tokens if t.group(1)}
-                      next_idx = 1
-                      def repl(t):
-                          nonlocal next_idx
-                          if t.group(1):
-                              return t.group(0)
-                          while next_idx in used:
-                              next_idx += 1
-                          x = t.group(0)
-                          out = '%' + str(next_idx) + '$' + x[1:]
-                          used.add(next_idx)
-                          next_idx += 1
-                          return out
-                      body = fmt_re.sub(repl, body)
-                  return '<string' + attrs + '>' + body + '</string>'
-
-              s = string_re.sub(replace_string, s)
-              p.write_text(s, encoding='utf-8')
-
-          # Patch the original AAR, not Gradle's immutable transformed workspace.
-          cache = Path.home() / '.gradle/caches/modules-2/files-2.1'
-          for aar in cache.rglob('android_gamepad_remapper-2.0.3.aar'):
-              tmp = Path(tempfile.mkdtemp(prefix='nx-gamepad-'))
-              try:
-                  with zipfile.ZipFile(aar, 'r') as z:
-                      z.extractall(tmp)
-                  values = tmp / 'res/values/values.xml'
-                  if values.exists():
-                      text = values.read_text(encoding='utf-8')
-                      text = re.sub(
-                          r'(<string\s+name="bind_process_waiting_joystick"[^>]*)>',
-                          r'\1 formatted="false">', text, count=1)
-                      values.write_text(text, encoding='utf-8')
-                  replacement = aar.with_suffix('.patched.aar')
-                  with zipfile.ZipFile(replacement, 'w', zipfile.ZIP_DEFLATED) as z:
-                      for f in tmp.rglob('*'):
-                          if f.is_file():
-                              z.write(f, f.relative_to(tmp))
-                  shutil.move(replacement, aar)
-              finally:
-                  shutil.rmtree(tmp, ignore_errors=True)
-
-          # Force Gradle to regenerate transforms from the patched AAR.
-          transforms = Path.home() / '.gradle/caches/9.5.0/transforms'
-          if transforms.exists():
-              for d in transforms.iterdir():
-                  if d.is_dir() and 'android_gamepad_remapper' in str(d):
-                      shutil.rmtree(d, ignore_errors=True)
-          PY
-      - name: Build release APK
+      - name: Build Release .apk
         run: |
-          chmod +x ./gradlew
-          ./gradlew :app_pojavlauncher:assembleRelease --stacktrace --no-build-cache
-          mkdir -p out
-          apk=$(find app_pojavlauncher/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)
-          test -n "$apk"
-          cp "$apk" out/NXLauncher-v1.0.0.apk
-          sha256sum out/NXLauncher-v1.0.0.apk > out/NXLauncher-v1.0.0.sha256
-      - name: Upload APK
+          # Build the launcher
+          gradle :app_pojavlauncher:assembleRelease
+          mv app_pojavlauncher/build/outputs/apk/release/app_pojavlauncher-release.apk out/app-release.apk
+
+      - name: Gen md5sums
+        run: |
+          md5sum out/app-release.apk > out/app-release.md5
+
+      - name: Build Debug .apk
+        run: |
+          # Build the launcher
+          gradle :app_pojavlauncher:assembleDebug
+          mv app_pojavlauncher/build/outputs/apk/debug/app_pojavlauncher-debug.apk out/app-debug.apk
+
+      - name: Gen md5sums
+        run: |
+          md5sum out/app-debug.apk > out/app-debug.md5
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: NXLauncher-v1.0.0
-          path: out/*
+          name: app-debug (recommended)
+          path: out/app-debug.*
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: out/app-release.*
