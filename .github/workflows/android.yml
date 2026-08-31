@@ -68,6 +68,12 @@ jobs:
           ./scripts/languagelist_updater.sh || true
           mkdir -p out
 
+      - name: Build LWJGL/GLFW compatibility components
+        run: |
+          ./gradlew :jre_lwjgl3glfw:build --no-build-cache --stacktrace
+          test -f app_pojavlauncher/src/main/assets/components/lwjgl3/3.3.3/lwjgl-3.3.3-merged-modules.jar
+          test -f app_pojavlauncher/src/main/assets/components/lwjgl3/3.4.1/lwjgl-3.4.1-merged-modules.jar
+
       - name: Build Release APK
         run: |
           ./gradlew :app_pojavlauncher:assembleRelease --no-build-cache --stacktrace
