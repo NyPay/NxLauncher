@@ -1,0 +1,44 @@
+name: NXLauncher v1.0.0 - Clean Build
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: nxlauncher-v1.0.0
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Download Java 8 runtime
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: build.yml
+          path: app_pojavlauncher/src/main/assets/components/jre
+          workflow_conclusion: completed
+          repo: AngelAuraMC/angelauramc-openjdk-build
+          branch: buildjre8
+          name: jre8-pojav
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: true
+          gradle-version: '9.5.0'
+      - name: Build APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app_pojavlauncher:assembleRelease --no-build-cache --stacktrace
+      - name: Find APK
+        id: apk
+        run: |
+          apk=$(find app_pojavlauncher/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
+          test -n "$apk"
+          mkdir -p out
+          cp "$apk" out/NXLauncher-v1.0.0.apk
+          sha256sum out/NXLauncher-v1.0.0.apk > out/NXLauncher-v1.0.0.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NXLauncher-v1.0.0
+          path: out/*
