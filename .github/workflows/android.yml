@@ -49,50 +49,35 @@ jobs:
           ./scripts/languagelist_updater.sh
           mkdir -p out
 
-      - name: Normalize Android string resources
+      - name: Validate Android string resources
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
+          import xml.etree.ElementTree as ET
           root = Path('app_pojavlauncher/src/main/res')
           for p in root.glob('values*/strings.xml'):
-              s = p.read_text(encoding='utf-8')
-              # Android resource strings do not accept arbitrary backslash escapes.
-              s = re.sub(r'(?<!\\)\\(?![nrt"\\\'])', r'\\\\', s)
-              # Convert printf-style placeholders to positional placeholders where possible.
-              counter = {}
-              def repl(m):
-                  token = m.group(0)
-                  if token.startswith('%%'):
-                      return token
-                  key = (p, token)
-                  counter[token] = counter.get(token, 0) + 1
-                  return '%' + str(counter[token]) + token[1:]
-              # Only normalize strings that contain more than one format argument.
-              def string_repl(m):
+              ET.parse(p)
+              text = p.read_text(encoding='utf-8')
+              bad = re.findall(r'(?<!\\)\\(?![nrt"\\\'])', text)
+              if bad:
+                  raise SystemExit(f'Invalid backslash escape in {p}')
+              for m in re.finditer(r'<string\b([^>]*)>(.*?)</string>', text, re.S):
                   body = m.group(2)
-                  args = re.findall(r'%(?!%)[0-9]*\$?[0-9]*(?:\.[0-9]+)?[a-zA-Z]', body)
-                  if len(args) > 1 and not any('$' in a for a in args):
-                      i = 0
-                      def a(m2):
-                          nonlocal i
-                          i += 1
-                          return '%' + str(i) + m2.group(0)[1:]
-                      body = re.sub(r'%(?!%)[0-9]*\$?[0-9]*(?:\.[0-9]+)?[a-zA-Z]', a, body)
-                  return m.group(1) + body + m.group(3)
-              s = re.sub(r'(<string\\b[^>]*>)(.*?)(</string>)', string_repl, s, flags=re.S)
-              p.write_text(s, encoding='utf-8')
+                  args = re.findall(r'%(?!%)(?:[0-9]+\$)?[-+0-9.#]*[a-zA-Z]', body)
+                  if len(args) > 1 and not any(re.match(r'%[0-9]+\$', a) for a in args):
+                      raise SystemExit(f'Non-positional format arguments in {p}: {body[:120]}')
           PY
 
       - name: Build NXLauncher v1.0.0 release APK
         run: |
-          gradle :app_pojavlauncher:assembleRelease
+          gradle :app_pojavlauncher:assembleRelease --stacktrace
           cp app_pojavlauncher/build/outputs/apk/release/app_pojavlauncher-release.apk out/NXLauncher-v1.0.0.apk
           sha256sum out/NXLauncher-v1.0.0.apk > out/NXLauncher-v1.0.0.sha256
 
       - name: Build debug APK
         run: |
-          gradle :app_pojavlauncher:assembleDebug
+          gradle :app_pojavlauncher:assembleDebug --stacktrace
           cp app_pojavlauncher/build/outputs/apk/debug/app_pojavlauncher-debug.apk out/NXLauncher-debug.apk
 
       - name: Upload release APK
