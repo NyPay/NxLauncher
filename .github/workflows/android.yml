@@ -27,36 +27,45 @@ jobs:
         with:
           validate-wrappers: true
           gradle-version: '9.5.0'
-      - name: Fix Android resources safely
+      - name: Prepare Android resources
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          roots = [Path('app_pojavlauncher/src/main/res')]
-          # Only repair actual Android string-format syntax. Do not touch dependency caches.
-          for root in roots:
-              for p in root.glob('values*/strings.xml'):
-                  s = p.read_text(encoding='utf-8')
-                  # Android aapt requires positional arguments when a format string has >1 argument.
-                  def fix_string(m):
-                      attrs, body = m.group(1), m.group(2)
-                      if 'formatted="false"' in attrs:
-                          return m.group(0)
-                      toks = list(re.finditer(r'%(?!%)(?:[0-9]+\$)?[-+0-9.#]*[a-zA-Z]', body))
-                      if len(toks) <= 1 or any(re.search(r'%[0-9]+\$', t.group(0)) for t in toks):
-                          return m.group(0)
+          root = Path('app_pojavlauncher/src/main/res')
+          exact = {
+            'dl_library_sha_unknown': 'Library %1$s cannot be checked; assuming it is valid.',
+            'global_error_field_empty': 'This field cannot be empty.',
+            'multirt_nocompatiblert': 'No compatible Java Runtime found. Java %1$d or newer is required.',
+            'multirt_nojava8rt': 'Java 8 is not installed. Install Java 8 to use this option.'
+          }
+          for p in root.glob('values*/strings.xml'):
+              s = p.read_text(encoding='utf-8')
+              for name, value in exact.items():
+                  pat = rf'<string\\s+name="{name}"[^>]*>.*?</string>'
+                  s = re.sub(pat, f'<string name="{name}">{value}</string>', s, flags=re.S)
+              def fix(m):
+                  attrs, body = m.group(1), m.group(2)
+                  tokens = list(re.finditer(r'%(?!%)(?:[0-9]+\\$)?[-+0-9.#]*[a-zA-Z]', body))
+                  if len(tokens) > 1 and not all(re.search(r'%[0-9]+\\$', t.group(0)) for t in tokens):
                       i = 0
                       def repl(t):
                           nonlocal i
                           i += 1
                           x = t.group(0)
+                          if re.match(r'%[0-9]+\\$', x): return x
                           return '%' + str(i) + '$' + x[1:]
                       body = re.sub(r'%(?!%)[-+0-9.#]*[a-zA-Z]', repl, body)
-                      return '<string' + attrs + '>' + body + '</string>'
-                  s = re.sub(r'<string\b([^>]*)>(.*?)</string>', fix_string, s, flags=re.S)
-                  p.write_text(s, encoding='utf-8')
+                  return '<string' + attrs + '>' + body + '</string>'
+              s = re.sub(r'<string\\b([^>]*)>(.*?)</string>', fix, s, flags=re.S)
+              p.write_text(s, encoding='utf-8')
           PY
+          # Download/resolve the gamepad dependency first, then patch only its generated resource copy.
+          ./gradlew :app_pojavlauncher:dependencies --configuration releaseRuntimeClasspath >/dev/null
+          find "$HOME/.gradle/caches" -type f -path '*android_gamepad_remapper-2.0.3*/res/values/values.xml' -print0 | while IFS= read -r -d '' f; do
+            sed -i 's/<string name="bind_process_waiting_joystick"/<string formatted="false" name="bind_process_waiting_joystick"/' "$f"
+          done
       - name: Build release APK
         run: |
           chmod +x ./gradlew
