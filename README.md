@@ -1,36 +1,70 @@
-# NXLauncher
+# NXLauncher 🇦🇲
 
-**NXLauncher v1.0.0** — Android launcher for Minecraft: Java Edition.
+**NXLauncher v1.0.0** — ժամանակակից Android launcher՝ Minecraft: Java Edition-ը Android սարքերում իրական գործարկելու համար։
 
-This repository is a branded distribution based on the existing open-source Amethyst/PojavLauncher Android launcher code already present here. The upstream implementation and required third-party license/attribution materials are retained.
+NXLauncher-ը ստեղծվում է Հայաստանից՝ հիմնվելով այս repository-ում արդեն առկա բաց կոդով Amethyst/PojavLauncher launcher-ի codebase-ի վրա։ Նախագծում պահպանվում են upstream-ի և օգտագործվող third-party բաղադրիչների անհրաժեշտ license-ները, credits-ը և attribution-ը։
 
-## Features
+## 🎮 Հիմնական հնարավորություններ
 
-- Real Minecraft Java Edition launch pipeline
-- Microsoft account authentication
-- Minecraft versions and profiles
-- Java Runtime management
-- RAM allocation
-- Renderer and performance settings
-- Fabric, Forge and NeoForge support
-- Mod/modpack management
-- Custom controls and gamepad support
-- Game files, worlds and resource-pack access
-- Crash logs and recovery activities
-- GitHub Actions APK builds
+- Իրական Minecraft: Java Edition launch
+- Microsoft account մուտք
+- Minecraft version/profile կառավարում
+- Minecraft տարբերակների ներբեռնում և տեղադրում
+- Java Runtime Manager
+- RAM allocation և անվտանգ ավտոմատ RAM կարգավորում
+- Renderer և performance կարգավորումներ
+- Fabric, Forge և NeoForge support
+- Mods / modpacks կառավարում
+- Worlds և game files կառավարում
+- Resource Packs
+- Custom controls և gamepad support
+- Crash logs և crash recovery
+- Safe fallback կարգավորումներ՝ crash-երի դեպքում
+- GitHub Actions-ով Android APK build
+- GitHub Releases-ի միջոցով թարմացումների տարածում
 
-## Performance
+## ✨ NXLauncher Design
 
-NXLauncher uses performance-first defaults where safe. The launcher targets high-refresh gameplay, including a 120 FPS target on capable devices, but does not guarantee 120 FPS on every phone. Performance depends on hardware, Minecraft version, renderer, resolution, render distance, shaders and mods.
+NXLauncher-ի interface-ը նախատեսված է ժամանակակից և premium Android experience-ի համար՝ NXLauncher branding-ով և նախագծի սեփական logo-ով։ Գլխավոր գործարկման գործողությունը ներկայացվում է հայերեն **«ԽԱՂԱԼ»** կոճակով։
 
-## Build
+Launcher-ի branding-ը ներառում է՝
 
-The `NXLauncher Android CI` workflow builds the release artifact as:
+**NX LAUNCHER**
+
+**ՊԱՏՐԱՍՏՎԵԼ Է ՀԱՅԱՍՏԱՆՈՒՄ**
+
+**ՍՏԵՂԾՈՂԸ Nyrox_YT**
+
+## ⚡ Performance
+
+NXLauncher-ը նպատակ ունի հնարավորինս performance-oriented լինել՝ օգտագործելով անվտանգ performance-first կարգավորումներ։ Նախագիծը նախատեսված է high-refresh gameplay-ի համար և կարող է նպատակադրել մինչև **120 FPS**՝ համապատասխան սարքերում։
+
+120 FPS-ը **չի երաշխավորվում բոլոր սարքերում**։ Իրական FPS-ը կախված է հեռախոսի CPU/GPU-ից, Minecraft-ի տարբերակից, renderer-ից, resolution-ից, render distance-ից, shaders-ից և տեղադրված mods-ից։
+
+RAM-ի և performance-ի կարգավորումները չպետք է օգտագործեն unsafe արժեքներ։ Crash-ի դեպքում launcher-ը պետք է հնարավորություն տա վերադառնալ ավելի անվտանգ կարգավորումների։
+
+## 🛠️ Build APK
+
+Android release build-ը կատարվում է GitHub Actions workflow-ի միջոցով։ Նպատակային release artifact-ի անունն է՝
 
 `NXLauncher-v1.0.0.apk`
 
-Required GitHub secrets for signing/API integrations must be configured in repository settings when a signed release build requires them.
+Build-ի համար օգտագործվում է այս repository-ի Android/Gradle project-ը։ Signed release-ի համար անհրաժեշտ signing secrets/API configuration-ը պետք է կարգավորվի repository-ի GitHub settings-ում, եթե տվյալ release workflow-ը պահանջում է դրանք։
 
-## License and attribution
+## 📦 Open-source հիմք և Credits
 
-See `LICENSE` and the third-party license files under `app_pojavlauncher/src/main/assets/licenses`. Upstream credits and required attribution are intentionally preserved.
+NXLauncher-ը չի փորձում ներկայացնել upstream launcher-ի codebase-ը որպես ամբողջությամբ զրոյից գրված նախագիծ։ Այն զարգացվում և branded է այս repository-ում առկա open-source launcher implementation-ի հիման վրա։
+
+Պարտադիր license-ներն ու attribution-ը պահպանվում են։ Մանրամասների համար տես՝
+
+- `LICENSE`
+- `app_pojavlauncher/src/main/assets/licenses`
+- repository-ի upstream/third-party credits
+
+## 🇦🇲 Նախագծի մասին
+
+NXLauncher-ը հայկական նախաձեռնություն է, որի նպատակն է Android-ում Minecraft Java Edition-ի համար ստեղծել ժամանակակից, արագ և օգտագործողի համար հարմար launcher experience։
+
+**NX LAUNCHER — ՊԱՏՐԱՍՏՎԵԼ Է ՀԱՅԱՍՏԱՆՈՒՄ**
+
+**ՍՏԵՂԾՈՂԸ՝ Nyrox_YT**
