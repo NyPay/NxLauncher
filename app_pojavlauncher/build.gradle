@@ -5,6 +5,11 @@ plugins {
 static def getDate() { return new Date().format('yyyyMMdd') }
 
 def getVersionName = {
+    String ciVersion = System.getenv("NX_VERSION_NAME")
+    if (ciVersion != null && !ciVersion.trim().isEmpty()) {
+        return ciVersion.trim()
+    }
+
     String TAG = ""
     String semVer = "1.0.0"
     String TAG_PART_COMMIT = ""
@@ -36,7 +41,8 @@ android {
         applicationId "org.nypay.nxlauncher"
         minSdkVersion 21
         targetSdkVersion 34
-        versionCode 10000
+        def ciVersionCode = System.getenv("NX_VERSION_CODE")
+        versionCode ciVersionCode ? ciVersionCode.toInteger() : 10000
         versionName getVersionName()
         multiDexEnabled true
         resValue 'string', 'curseforge_api_key', getCFApiKey()
