@@ -68,3 +68,7 @@ NXLauncher-ը հայկական նախաձեռնություն է, որի նպա�
 **NX LAUNCHER — ՊԱՏՐԱՍՏՎԵԼ Է ՀԱՅԱՍՏԱՆՈՒՄ**
 
 **ՍՏԵՂԾՈՂԸ՝ Nyrox_YT**
+
+**NX LAUNCHER WIKI —** https://nxlauncher-wiki.lovable.app/
+
+**NX LAUNCHER WEBSITE —** https://nxlauncher.lovable.app/
