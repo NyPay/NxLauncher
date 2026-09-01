@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false">
+        <inset android:inset="@dimen/_3sdp">
+            <shape android:shape="rectangle">
+                <corners android:radius="@dimen/_8sdp" />
+                <solid android:color="@color/background_bottom_bar" />
+                <stroke android:width="@dimen/_1sdp" android:color="@color/launcher_button_stroke" />
+            </shape>
+        </inset>
+    </item>
+    <item android:state_pressed="true">
+        <inset android:inset="@dimen/_3sdp">
+            <shape android:shape="rectangle">
+                <corners android:radius="@dimen/_8sdp" />
+                <solid android:color="@color/launcher_button_pressed" />
+                <stroke android:width="@dimen/_1sdp" android:color="@color/launcher_button_pressed_stroke" />
+            </shape>
+        </inset>
+    </item>
+    <item>
+        <inset android:inset="@dimen/_3sdp">
+            <shape android:shape="rectangle">
+                <corners android:radius="@dimen/_8sdp" />
+                <solid android:color="@color/launcher_button_background" />
+                <stroke android:width="@dimen/_1sdp" android:color="@color/launcher_button_stroke" />
+            </shape>
+        </inset>
+    </item>
+</selector>
