@@ -40,6 +40,8 @@ import java.util.List;
 public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
+    private static final String NXLAUNCHER_WIKI_URL = "https://nxlauncher-wiki.lovable.app";
+
     private mcVersionSpinner mVersionSpinner;
 
     public MainMenuFragment(){
@@ -59,7 +61,7 @@ public class MainMenuFragment extends Fragment {
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
 
-        mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
+        mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), NXLAUNCHER_WIKI_URL));
         mDiscordButton.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.discord_invite)));
         mCustomControlButton.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
         mInstallJarButton.setOnClickListener(v -> runInstallerWithConfirmation(false));
