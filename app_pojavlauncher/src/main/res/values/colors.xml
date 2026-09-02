@@ -12,4 +12,13 @@
 
     <color name="primary_text">#FFFFFF</color>
     <color name="secondary_text">#B2B2B2</color>
+
+    <!-- NXLauncher modern button palette -->
+    <color name="launcher_button_background">#20252A</color>
+    <color name="launcher_button_pressed">#2B3338</color>
+    <color name="launcher_button_stroke">#343C42</color>
+    <color name="launcher_button_pressed_stroke">#4CAF50</color>
+    <color name="launcher_play_background">#2E8B3C</color>
+    <color name="launcher_play_pressed">#256F31</color>
+    <color name="launcher_play_stroke">#58D26A</color>
 </resources>

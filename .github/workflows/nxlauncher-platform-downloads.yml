@@ -1,0 +1,77 @@
+name: NXLauncher Platform Downloads
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - nxlauncher-v1.0.0
+    paths:
+      - '.github/workflows/nxlauncher-platform-downloads.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-platform-downloads:
+    name: Publish iOS + Desktop downloads
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install GitHub CLI
+        run: gh --version
+
+      - name: Prepare download directory
+        run: mkdir -p out
+
+      - name: Download latest iOS Java launcher build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/ios
+          gh release download --repo catsruledogs/Amethyst-iOS-25 --pattern '*.ipa' --dir /tmp/ios --clobber
+          ipa=$(find /tmp/ios -maxdepth 1 -type f -name '*.ipa' | head -n 1)
+          test -n "$ipa"
+          cp "$ipa" out/NXLauncher-iOS.ipa
+
+      - name: Download latest Windows launcher
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/windows
+          gh release download --repo PrismLauncher/PrismLauncher --pattern '*Windows-MSVC-Setup-*.exe' --dir /tmp/windows --clobber
+          exe=$(find /tmp/windows -maxdepth 1 -type f -name '*.exe' | head -n 1)
+          test -n "$exe"
+          cp "$exe" out/NXLauncher-Windows-Setup.exe
+
+      - name: Download latest macOS launcher
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/macos
+          gh release download --repo PrismLauncher/PrismLauncher --pattern 'PrismLauncher-macOS-*.dmg' --dir /tmp/macos --clobber
+          dmg=$(find /tmp/macos -maxdepth 1 -type f -name '*.dmg' | head -n 1)
+          test -n "$dmg"
+          cp "$dmg" out/NXLauncher-macOS.dmg
+
+      - name: Download latest Linux x86_64 launcher
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/linux
+          gh release download --repo PrismLauncher/PrismLauncher --pattern 'PrismLauncher-Linux-x86_64.AppImage' --dir /tmp/linux --clobber
+          appimage=$(find /tmp/linux -maxdepth 1 -type f -name '*.AppImage' | head -n 1)
+          test -n "$appimage"
+          cp "$appimage" out/NXLauncher-Linux-x86_64.AppImage
+          chmod +x out/NXLauncher-Linux-x86_64.AppImage
+
+      - name: Generate checksums
+        run: sha256sum out/* > out/SHA256SUMS.txt
+
+      - name: Replace platform release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete nxlauncher-platform-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create nxlauncher-platform-latest out/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title 'NXLauncher Platform Downloads' \
+            --notes 'NXLauncher platform downloads. Android is built separately by the existing Android workflow and is intentionally not modified by this workflow.\n\nThe iOS package is based on the open-source Amethyst iOS Java launcher. Desktop packages are based on Prism Launcher releases. Their respective upstream licenses and attribution remain applicable.\n\nFor iOS, installation requires a supported sideloading method; Java Minecraft on iOS requires JIT for usable performance.'

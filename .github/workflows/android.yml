@@ -3,12 +3,17 @@ name: Android CI
 on:
   pull_request:
     branches-ignore:
-      - 'l10n_v3_openjdk' 
-    types: [ opened, reopened ]
+      - 'l10n_v3_openjdk'
+    types: [opened, reopened]
   push:
     branches-ignore:
       - 'l10n_v3_openjdk'
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -17,15 +22,31 @@ jobs:
       GPLAY_KEYSTORE_PASSWORD: ${{ secrets.GPLAY_KEYSTORE_PASSWORD }}
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
-      - name: Checkout
+      - name: Checkout NXLauncher
         uses: actions/checkout@v4
         with:
-          submodules: "recursive"
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="dev-${GITHUB_RUN_NUMBER}"
+          fi
+          echo "NX_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "NX_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "NX_APK_NAME=NXLauncher-v${VERSION}.apk" >> "$GITHUB_ENV"
+          echo "NX_DEBUG_APK_NAME=NXLauncher-v${VERSION}-debug.apk" >> "$GITHUB_ENV"
+          echo "Building NXLauncher $VERSION"
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
 
       - name: Get JRE 8
@@ -38,74 +59,74 @@ jobs:
           branch: buildjre8
           name: jre8-pojav
 
-      # - name: Get JRE17
-      #   uses: dawidd6/action-download-artifact@v9
-      #   with:
-      #     workflow: build.yml
-      #     path: app_pojavlauncher/src/main/assets/components/jre-new
-      #     workflow_conclusion: completed
-      #     repo: AngelAuraMC/angelauramc-openjdk-build
-      #     branch: buildjre17-21
-      #     name: jre17-pojav
-      #
-      # - name: Get JRE21
-      #   uses: dawidd6/action-download-artifact@v9
-      #   with:
-      #     workflow: build.yml
-      #     path: app_pojavlauncher/src/main/assets/components/jre-21
-      #     workflow_conclusion: completed
-      #     repo: AngelAuraMC/angelauramc-openjdk-build
-      #     branch: buildjre17-21
-      #     name: jre21-pojav
-      #
-      # - name: Get JRE25
-      #   uses: dawidd6/action-download-artifact@v9
-      #   with:
-      #     workflow: build.yml
-      #     path: app_pojavlauncher/src/main/assets/components/jre-25
-      #     workflow_conclusion: completed
-      #     repo: FCL-Team/Android-OpenJDK-Build
-      #     branch: Build_JRE_25
-      #     name: jre25-multiarch
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           validate-wrappers: false
-          gradle-version: "9.6.1"
+          gradle-version: '9.6.1'
+
+      - name: Prepare NXLauncher signing key
+        shell: bash
+        env:
+          NX_KEYSTORE_B64: ${{ secrets.NX_KEYSTORE_B64 }}
+          NX_KEYSTORE_PASSWORD: ${{ secrets.NX_KEYSTORE_PASSWORD }}
+          NX_KEY_ALIAS: ${{ secrets.NX_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          test -n "$NX_KEYSTORE_B64"
+          test -n "$NX_KEYSTORE_PASSWORD"
+          test -n "$NX_KEY_ALIAS"
+          printf '%s' "$NX_KEYSTORE_B64" | base64 --decode > app_pojavlauncher/NXLauncher-release.jks
+          test -s app_pojavlauncher/NXLauncher-release.jks
+          echo "NX_KEYSTORE_PATH=$GITHUB_WORKSPACE/app_pojavlauncher/NXLauncher-release.jks" >> "$GITHUB_ENV"
+          echo "NX_KEYSTORE_PASSWORD=$NX_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "NX_KEY_ALIAS=$NX_KEY_ALIAS" >> "$GITHUB_ENV"
 
       - name: Run scripts
         run: |
-          ./scripts/languagelist_updater.sh
-          mkdir out
+          chmod +x scripts/fix_local_account_download.sh
+          ./scripts/fix_local_account_download.sh
+          ./scripts/languagelist_updater.sh || true
+          mkdir -p out
 
-      - name: Build Release .apk
+      - name: Build LWJGL/GLFW compatibility components
         run: |
-          # Build the launcher
-          gradle :app_pojavlauncher:assembleRelease
-          mv app_pojavlauncher/build/outputs/apk/release/app_pojavlauncher-release.apk out/app-release.apk
+          ./gradlew :jre_lwjgl3glfw:build --no-build-cache --stacktrace
+          test -f app_pojavlauncher/src/main/assets/components/lwjgl3/3.3.3/lwjgl-3.3.3-merged-modules.jar
+          test -f app_pojavlauncher/src/main/assets/components/lwjgl3/3.4.1/lwjgl-3.4.1-merged-modules.jar
 
-      - name: Gen md5sums
+      - name: Build Release APK
+        env:
+          NX_VERSION_NAME: ${{ env.NX_VERSION_NAME }}
+          NX_VERSION_CODE: ${{ env.NX_VERSION_CODE }}
         run: |
-          md5sum out/app-release.apk > out/app-release.md5
+          ./gradlew :app_pojavlauncher:assembleRelease --no-build-cache --stacktrace
+          apk=$(find app_pojavlauncher/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
+          test -n "$apk"
+          cp "$apk" "out/$NX_APK_NAME"
+          md5sum "out/$NX_APK_NAME" > "out/${NX_APK_NAME%.apk}.md5"
+          sha256sum "out/$NX_APK_NAME" > "out/${NX_APK_NAME%.apk}.sha256"
 
-      - name: Build Debug .apk
+      - name: Build Debug APK
         run: |
-          # Build the launcher
-          gradle :app_pojavlauncher:assembleDebug
-          mv app_pojavlauncher/build/outputs/apk/debug/app_pojavlauncher-debug.apk out/app-debug.apk
+          ./gradlew :app_pojavlauncher:assembleDebug --no-build-cache --stacktrace
+          apk=$(find app_pojavlauncher/build/outputs/apk/debug -type f -name '*.apk' | head -n 1)
+          test -n "$apk"
+          cp "$apk" "out/$NX_DEBUG_APK_NAME"
 
-      - name: Gen md5sums
-        run: |
-          md5sum out/app-debug.apk > out/app-debug.md5
-
-      - name: Upload debug APK
+      - name: Upload NXLauncher APKs
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug (recommended)
-          path: out/app-debug.*
+          name: NXLauncher-${{ env.NX_VERSION_NAME }}
+          path: out/*
 
-      - name: Upload release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: out/app-release.*
+      - name: Create GitHub Release and attach APK
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "out/$NX_APK_NAME" \
+            "out/${NX_APK_NAME%.apk}.md5" \
+            "out/${NX_APK_NAME%.apk}.sha256" \
+            --title "NXLauncher $NX_VERSION_NAME" \
+            --generate-notes
