@@ -11,7 +11,7 @@ def getVersionName = {
     }
 
     String TAG = ""
-    String semVer = "1.0.0"
+    String semVer = "2.5.6"
     String TAG_PART_COMMIT = ""
     String TAG_STRING
     try { TAG = providers.exec { commandLine 'git', 'describe', '--tags'; ignoreExitValue = true }.getStandardOutput().asText.get() } catch (Exception ignored) {}
@@ -42,14 +42,14 @@ android {
         minSdkVersion 21
         targetSdkVersion 34
         def ciVersionCode = System.getenv("NX_VERSION_CODE")
-        versionCode ciVersionCode ? ciVersionCode.toInteger() : 10000
+        versionCode ciVersionCode ? ciVersionCode.toInteger() : 20506
         versionName getVersionName()
         multiDexEnabled true
         resValue 'string', 'curseforge_api_key', getCFApiKey()
         externalNativeBuild { ndkBuild { arguments "APP_SHORT_COMMANDS=true" } }
     }
     signingConfigs {
-        customDebug { storeFile file("debug.keystore"); storePassword "android"; keyAlias "androiddebugkey"; keyPassword "android" }
+        customDebug { storeFile file("debug.keystore"); storePassword "android"; keyAlias "androiddebugkey"; keyPassword "androiddebugkey" }
         customRelease {
             def nxKeyStorePath = System.getenv("NX_KEYSTORE_PATH")
             storeFile nxKeyStorePath ? file(nxKeyStorePath) : file("NXLauncher-release.jks")
