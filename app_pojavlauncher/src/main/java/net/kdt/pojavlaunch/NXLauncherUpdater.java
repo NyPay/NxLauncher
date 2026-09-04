@@ -4,11 +4,9 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
@@ -29,69 +27,64 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-/** Lightweight in-app updater. It never blocks launcher startup and only shows when a newer APK exists. */
+/** Safe in-app updater. A failed check/download/install never interrupts the launcher. */
 public final class NXLauncherUpdater {
-    private static final String MANIFEST_URL = "https://raw.githubusercontent.com/NyPay/NxLauncher/nxlauncher-v1.0.0/update.json";
-    private static final int CURRENT_VERSION_CODE = 10000;
-    private static final String PREFS = "nxlauncher_updater";
-    private static final String PREF_SKIPPED_VERSION = "skipped_version";
+    private static final String MANIFEST_URL = "https://raw.githubusercontent.com/NyPay/NxLauncher/NXLauncher-v2.5.6/update.json";
+    private static final String UPDATE_APK_NAME = "NXLauncher-update.apk";
 
     private NXLauncherUpdater() {}
 
     public static void check(Activity activity) {
-        if (activity == null || activity.isFinishing()) return;
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
         new Thread(() -> {
+            HttpURLConnection c = null;
             try {
-                HttpURLConnection c = (HttpURLConnection) new URL(MANIFEST_URL).openConnection();
+                c = (HttpURLConnection) new URL(MANIFEST_URL + "?t=" + System.currentTimeMillis()).openConnection();
                 c.setConnectTimeout(5000);
                 c.setReadTimeout(7000);
-                c.setRequestProperty("Cache-Control", "no-cache");
+                c.setUseCaches(false);
                 if (c.getResponseCode() != HttpURLConnection.HTTP_OK) return;
-                InputStream in = c.getInputStream();
-                byte[] data = readAll(in);
-                in.close();
-                c.disconnect();
-                JSONObject json = new JSONObject(new String(data, "UTF-8"));
-                int version = json.getInt("versionCode");
-                String url = json.getString("apkUrl");
-                String name = json.optString("versionName", "NXLauncher Update");
-                if (version <= CURRENT_VERSION_CODE || url.trim().isEmpty()) return;
-                int skipped = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(PREF_SKIPPED_VERSION, -1);
-                if (skipped == version) return;
-                new Handler(Looper.getMainLooper()).post(() -> showDialog(activity, version, name, url));
-            } catch (Exception ignored) {
-                // Update checking must never crash or interrupt the launcher.
+                try (InputStream in = c.getInputStream()) {
+                    byte[] data = readAll(in);
+                    JSONObject json = new JSONObject(new String(data, "UTF-8"));
+                    int remoteCode = json.optInt("versionCode", 0);
+                    String apkUrl = json.optString("apkUrl", "").trim();
+                    String versionName = json.optString("versionName", "NXLauncher Update");
+                    if (remoteCode <= BuildConfig.VERSION_CODE || apkUrl.isEmpty()) return;
+                    new Handler(Looper.getMainLooper()).post(() -> showDialog(activity, versionName, apkUrl));
+                }
+            } catch (Throwable ignored) {
+                // Network/update errors must never crash NXLauncher.
+            } finally {
+                if (c != null) c.disconnect();
             }
         }, "NXLauncher-UpdateCheck").start();
     }
 
-    private static void showDialog(Activity activity, int version, String versionName, String apkUrl) {
+    private static void showDialog(Activity activity, String versionName, String apkUrl) {
         if (activity.isFinishing() || activity.isDestroyed()) return;
-
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(42, 32, 42, 28);
+        root.setPadding(42, 34, 42, 30);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.rgb(24, 24, 31));
         bg.setCornerRadius(38);
         root.setBackground(bg);
 
         TextView title = text(activity, "NXLauncher  •  ԹԱՐՄԱՑՈՒՄ", 22, Color.WHITE);
-        TextView message = text(activity, "Հասանելի է NXLauncher-ի նոր տարբերակ՝ " + versionName + "։\n\nԹարմացրու հիմա՝ նոր հնարավորություններն ու ուղղումները ստանալու համար։", 15, Color.LTGRAY);
+        TextView message = text(activity, "Հասանելի է նոր տարբերակ՝ " + versionName + ".\n\nԹարմացրու հիմա՝ նոր հնարավորություններն ու սխալների ուղղումները ստանալու համար։", 15, Color.LTGRAY);
         message.setPadding(0, 14, 0, 22);
         root.addView(title);
         root.addView(message);
 
         LinearLayout actions = new LinearLayout(activity);
         actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-
         Button close = button(activity, "✕");
         Button update = button(activity, "ԹԱՐՄԱՑՆԵԼ");
         actions.addView(close, new LinearLayout.LayoutParams(70, 58));
-        LinearLayout.LayoutParams upLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, 58);
-        upLp.leftMargin = 12;
-        actions.addView(update, upLp);
+        LinearLayout.LayoutParams updateParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, 58);
+        updateParams.leftMargin = 12;
+        actions.addView(update, updateParams);
         root.addView(actions);
 
         AlertDialog dialog = new AlertDialog.Builder(activity).setView(root).create();
@@ -106,41 +99,46 @@ public final class NXLauncherUpdater {
         LinearLayout box = new LinearLayout(activity);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(42, 34, 42, 34);
-        TextView t = text(activity, "Ներբեռնվում է…", 19, Color.WHITE);
-        ProgressBar p = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
-        p.setMax(100);
-        box.addView(t);
-        box.addView(p, new LinearLayout.LayoutParams(-1, 12));
+        TextView status = text(activity, "Ներբեռնվում է…", 19, Color.WHITE);
+        ProgressBar progress = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100);
+        box.addView(status);
+        box.addView(progress, new LinearLayout.LayoutParams(-1, 12));
         dialog.setView(box);
+
         new Thread(() -> {
-            File apk = new File(activity.getCacheDir(), "NXLauncher-update.apk");
+            File apk = new File(activity.getCacheDir(), UPDATE_APK_NAME);
+            HttpURLConnection c = null;
             try {
-                HttpURLConnection c = (HttpURLConnection) new URL(apkUrl).openConnection();
+                if (apk.exists() && !apk.delete()) throw new IllegalStateException("Cannot replace old update");
+                c = (HttpURLConnection) new URL(apkUrl).openConnection();
                 c.setConnectTimeout(10000);
-                c.setReadTimeout(20000);
+                c.setReadTimeout(30000);
+                c.setInstanceFollowRedirects(true);
                 c.connect();
+                if (c.getResponseCode() < 200 || c.getResponseCode() >= 300) throw new IllegalStateException("HTTP " + c.getResponseCode());
                 int total = c.getContentLength();
-                InputStream in = c.getInputStream();
-                FileOutputStream out = new FileOutputStream(apk);
-                byte[] b = new byte[65536];
-                int n, done = 0;
-                while ((n = in.read(b)) != -1) {
-                    out.write(b, 0, n);
-                    done += n;
-                    if (total > 0) {
-                        int progress = (int) ((done * 100L) / total);
-                        new Handler(Looper.getMainLooper()).post(() -> p.setProgress(progress));
+                try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(apk)) {
+                    byte[] buffer = new byte[65536];
+                    int n, done = 0;
+                    while ((n = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, n);
+                        done += n;
+                        if (total > 0) {
+                            int value = (int) ((done * 100L) / total);
+                            new Handler(Looper.getMainLooper()).post(() -> progress.setProgress(value));
+                        }
                     }
                 }
-                out.close();
-                in.close();
-                c.disconnect();
+                if (!apk.isFile() || apk.length() < 1024) throw new IllegalStateException("Invalid APK");
                 new Handler(Looper.getMainLooper()).post(() -> install(activity, dialog, apk));
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    t.setText("Չհաջողվեց ներբեռնել թարմացումը։\nԿարող ես նորից փորձել։");
-                    p.setVisibility(View.GONE);
+                    status.setText("Չհաջողվեց ներբեռնել թարմացումը։\nՓորձիր կրկին։");
+                    progress.setVisibility(View.GONE);
                 });
+            } finally {
+                if (c != null) c.disconnect();
             }
         }, "NXLauncher-UpdateDownload").start();
     }
@@ -153,23 +151,23 @@ public final class NXLauncherUpdater {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             activity.startActivity(intent);
             dialog.dismiss();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             TextView error = text(activity, "Չհաջողվեց բացել տեղադրման պատուհանը։", 16, Color.WHITE);
             dialog.setView(error);
         }
     }
 
-    private static TextView text(Context c, String s, int size, int color) {
+    private static TextView text(Context c, String value, int size, int color) {
         TextView v = new TextView(c);
-        v.setText(s);
+        v.setText(value);
         v.setTextSize(size);
         v.setTextColor(color);
         return v;
     }
 
-    private static Button button(Context c, String s) {
+    private static Button button(Context c, String value) {
         Button b = new Button(c);
-        b.setText(s);
+        b.setText(value);
         b.setTextSize(13);
         b.setAllCaps(false);
         return b;
@@ -177,9 +175,9 @@ public final class NXLauncherUpdater {
 
     private static byte[] readAll(InputStream in) throws Exception {
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-        byte[] b = new byte[8192];
+        byte[] buffer = new byte[8192];
         int n;
-        while ((n = in.read(b)) != -1) out.write(b, 0, n);
+        while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
         return out.toByteArray();
     }
 }
